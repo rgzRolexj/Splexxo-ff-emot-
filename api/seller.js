@@ -1,6 +1,7 @@
 // ==================== CONFIG =====================
 const YOUR_API_KEYS = ["SPLEXXO"];
-const TARGET_API = "http://176.100.37.91:30200";
+const TARGET_API = "https://ai-of30.onrender.com/ask";
+const TARGET_API_KEY = "CODEX";
 const CACHE_TIME = 3600 * 1000;
 // =================================================
 
@@ -33,17 +34,18 @@ export default async function handler(req, res) {
         return res.status(405).json({ error: "method not allowed" });
     }
 
-    const { endpoint, key, ...otherParams } = req.query || {};
+    const { message, key } = req.query || {};
 
     // Param check
-    if (!key) {
+    if (!message || !key) {
         res.setHeader("Content-Type", "application/json; charset=utf-8");
         return res.status(400).json({ 
             error: "missing parameters", 
-            details: "API key required: ?key=SPLEXXO" 
+            details: "Use: ?message=YourQuestion&key=SPLEXXO" 
         });
     }
 
+    const cleanMessage = String(message).trim();
     const cleanKey = String(key).trim();
 
     // API key check
@@ -52,11 +54,9 @@ export default async function handler(req, res) {
         return res.status(403).json({ error: "invalid key" });
     }
 
-    // Cache key banayo - sab parameters se
-    const cacheKey = JSON.stringify(req.query);
-
     // Cache check
     const now = Date.now();
+    const cacheKey = cleanMessage;
     const cached = cache.get(cacheKey);
 
     if (cached && now - cached.timestamp < CACHE_TIME) {
@@ -65,15 +65,8 @@ export default async function handler(req, res) {
         return res.status(200).send(cached.response);
     }
 
-    // URL build - sab parameters forward karo (key ko chod kar)
-    const params = new URLSearchParams();
-    for (const [param, value] of Object.entries(otherParams)) {
-        if (param !== 'key') {
-            params.append(param, value);
-        }
-    }
-
-    const url = `${TARGET_API}${endpoint ? '/' + endpoint : ''}${params.toString() ? '?' + params.toString() : ''}`;
+    // AI Chat API call
+    const url = `${TARGET_API}?message=${encodeURIComponent(cleanMessage)}&key=${TARGET_API_KEY}`;
 
     try {
         const upstream = await fetch(url);
@@ -83,7 +76,7 @@ export default async function handler(req, res) {
         if (!upstream.ok || !raw) {
             res.setHeader("Content-Type", "application/json; charset=utf-8");
             return res.status(502).json({
-                error: "IP API failed",
+                error: "AI API failed",
                 details: `HTTP ${upstream.status}`,
             });
         }
@@ -121,8 +114,8 @@ export default async function handler(req, res) {
     } catch (err) {
         res.setHeader("Content-Type", "application/json; charset=utf-8");
         return res.status(502).json({
-            error: "IP API request error",
+            error: "AI API request error",
             details: err.message || "unknown error",
         });
     }
-              }
+}
